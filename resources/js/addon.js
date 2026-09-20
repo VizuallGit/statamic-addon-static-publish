@@ -293,10 +293,14 @@
                     </ul>
                 </ui-alert>
 
-                <div v-if="latest.report && (latest.report.warnings.length || latest.report.external_hosts.length)" class="sp-box" style="margin-top:.75rem">
+                <div v-if="latest.report && (latest.report.warnings.length || latest.report.external_hosts.length || (latest.report.excluded || []).length)" class="sp-box" style="margin-top:.75rem">
                     <template v-if="latest.report.warnings.length">
                         <ui-text size="sm" text="Bemærk" />
                         <ul class="sp-list"><li v-for="w in latest.report.warnings" :key="w">{{ w }}</li></ul>
+                    </template>
+                    <template v-if="(latest.report.excluded || []).length">
+                        <ui-text size="sm" text="Udeladt (redaktørsider)" />
+                        <span class="sp-mono">{{ latest.report.excluded.join(', ') }}</span>
                     </template>
                     <template v-if="latest.report.external_hosts.length">
                         <ui-text size="sm" text="Eksterne hosts på siderne" />

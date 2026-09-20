@@ -89,6 +89,7 @@ class UtilityController
                 'errors' => $run['report']['errors'],
                 'warnings' => $run['report']['warnings'],
                 'external_hosts' => $run['report']['external_hosts'],
+                'excluded' => $run['report']['excluded'] ?? [],
                 'pages' => $run['report']['pages'],
                 'files' => $run['report']['files'],
                 'bytes' => $run['report']['bytes'],

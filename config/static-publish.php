@@ -36,6 +36,12 @@ return [
         'file_bytes' => 25 * 1024 * 1024,
     ],
 
+    // Views that make an entry an editor page rather than a page of the site:
+    // the section galleries (get:preview_section) and the showcase layout
+    // that always writes noindex. Matched against each entry's template and
+    // layout name; `*` is a wildcard. Such entries are left out of the copy.
+    'editor_views' => ['skabelon_*'],
+
     // How many runs the utility page lists.
     'history' => 5,
 ];

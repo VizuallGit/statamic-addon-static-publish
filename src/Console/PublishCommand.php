@@ -81,6 +81,10 @@ class PublishCommand extends Command
             $report['excluded'] = $exported['excluded'];
             $report['skipped'] = $exported['skipped'];
 
+            if (in_array('/', $exported['excluded'], true)) {
+                $report['warnings'][] = 'Forsiden (/) er udeladt, fordi den bruger en redaktør-skabelon eller et redaktør-layout (skabelon_*). Live-sitet har ingen forside, før forsiden bruger en almindelig skabelon.';
+            }
+
             foreach ($exported['skipped'] as $skipped) {
                 $report['warnings'][] = $skipped['path'].' fylder '.number_format($skipped['bytes'] / 1048576, 1, ',', '.').' MiB og er ikke med. Cloudflares grænse er 25 MiB pr. fil.';
             }
@@ -96,6 +100,10 @@ class PublishCommand extends Command
             }
 
             $this->line(sprintf('  %d sider, %d filer, %s MB', $report['pages'], $report['files'], number_format($report['bytes'] / 1000000, 1, ',', '.')));
+
+            if ($report['excluded']) {
+                $this->line('  Udeladt (redaktørsider): '.implode(', ', $report['excluded']));
+            }
 
             if ($report['external_hosts']) {
                 $this->line('  Eksterne hosts: '.implode(', ', $report['external_hosts']));

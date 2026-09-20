@@ -5,7 +5,7 @@ namespace Vizuall\StaticPublish\Publish;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\File;
-use InvalidArgumentException;
+use Illuminate\Support\Str;
 use Statamic\Facades\AssetContainer;
 use Statamic\Facades\Cascade;
 use Statamic\Facades\Entry;
@@ -21,14 +21,12 @@ use Symfony\Component\Finder\Finder;
  *  - base_url is the live URL, so absolute links point at Cloudflare;
  *  - `environment` is forced to `production` through Cascade::hydrated, so
  *    the layout's noindex tag is not written into the copy;
- *  - editor pages (templates that read `get:preview_section`) are excluded;
+ *  - editor pages (entries whose template or layout matches one of the
+ *    configured `editor_views` patterns, `skabelon_*` by default) are excluded;
  *  - files larger than Cloudflare's per-file limit are left out and reported.
  */
 class Exporter
 {
-    /** @var array<string, bool> template name → is an editor page */
-    protected array $editorTemplates = [];
-
     public function __construct(
         protected string $liveUrl,
         protected string $destination,
@@ -83,32 +81,22 @@ class Exporter
     }
 
     /**
-     * Entries whose template reads `get:preview_section` are editor pages
-     * (section galleries with iframe previews), not pages of the site.
+     * Entries rendered with an editor view are not pages of the site: the
+     * section galleries and the showcase layout that always writes noindex.
+     * Which views are editor views is one configured list of name patterns,
+     * matched against the entry's template and layout.
      */
     public function excludedUrls(): array
     {
+        $patterns = (array) config('static-publish.editor_views', []);
+
         return Entry::all()
             ->filter(fn ($entry) => $entry->uri() !== null)
-            ->filter(fn ($entry) => $this->isEditorTemplate((string) $entry->template()))
+            ->filter(fn ($entry) => Str::is($patterns, (string) $entry->template()) || Str::is($patterns, (string) $entry->layout()))
             ->map(fn ($entry) => $entry->url())
             ->unique()
             ->values()
             ->all();
-    }
-
-    protected function isEditorTemplate(string $template): bool
-    {
-        if (! array_key_exists($template, $this->editorTemplates)) {
-            try {
-                $path = view()->getFinder()->find($template);
-                $this->editorTemplates[$template] = str_contains((string) File::get($path), 'get:preview_section');
-            } catch (InvalidArgumentException) {
-                $this->editorTemplates[$template] = false;
-            }
-        }
-
-        return $this->editorTemplates[$template];
     }
 
     /**
