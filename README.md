@@ -19,6 +19,13 @@ CLOUDFLARE_ACCOUNT_ID=  # kontoens ID (32 tegn)
 
 Serveren skal have Node 20+ (`npx`) og kunne nå `api.cloudflare.com` og `registry.npmjs.org`.
 
+Webserverens PHP-proces (php-fpm) har sjældent `node` på sin PATH, og det er den proces der starter udgivelsen fra knappen. Peg derfor på npx med fuld sti; mappen lægges på PATH for wrangler-processen, så `node` findes ved siden af:
+
+```
+STATIC_PUBLISH_NPX=/usr/local/bin/npx      # eller nvm's bin-mappe
+STATIC_PUBLISH_PHP=                        # kun hvis php-kommandolinjen ikke findes af sig selv
+```
+
 ## Indstillinger
 
 Under Tools → Utilities → Static Publish (og Addons → Static Publish → Settings). Gemmes i `resources/addons/static-publish.yaml`; ingen hemmeligheder.

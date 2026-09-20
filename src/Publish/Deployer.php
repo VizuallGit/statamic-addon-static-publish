@@ -42,10 +42,21 @@ class Deployer
             ],
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
+        $npx = (string) config('static-publish.npx');
+
+        // A web server's PHP process rarely has node on its PATH. When npx is
+        // given as an absolute path (STATIC_PUBLISH_NPX), its folder goes first
+        // on PATH for this one process, so the `node` that npx itself needs
+        // is found next to it.
+        $path = str_starts_with($npx, '/')
+            ? dirname($npx).PATH_SEPARATOR.(getenv('PATH') ?: '/usr/bin:/bin')
+            : (getenv('PATH') ?: '/usr/bin:/bin');
+
         try {
             $result = Process::path($work)
                 ->timeout(900)
                 ->env([
+                    'PATH' => $path,
                     'CLOUDFLARE_API_TOKEN' => $this->apiToken,
                     'CLOUDFLARE_ACCOUNT_ID' => $this->accountId,
                     'WRANGLER_SEND_METRICS' => 'false',
@@ -53,7 +64,7 @@ class Deployer
                     'NO_COLOR' => '1',
                 ])
                 ->run([
-                    config('static-publish.npx'), '--yes', config('static-publish.wrangler'),
+                    $npx, '--yes', config('static-publish.wrangler'),
                     'deploy', '--config', "{$work}/wrangler.jsonc",
                 ], fn ($type, $buffer) => $line($buffer));
         } finally {
