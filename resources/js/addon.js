@@ -49,16 +49,16 @@
 .sp-dot{width:.5em;height:.5em;border-radius:50%;background:currentColor;opacity:.4}
 .sp-step.is-on .sp-dot{opacity:1;background:var(--sp-accent);animation:sp-pulse 1s ease-in-out infinite}
 @keyframes sp-pulse{50%{opacity:.3}}
-.sp-list{margin:0;padding-inline-start:1.1rem;font-size:.875rem;line-height:1.5}
+.sp-list{margin:0;padding:0;list-style:none;font-size:.8125rem;line-height:1.5;opacity:.7}
 .sp-box-title{font-weight:600;font-size:.875rem}
-.sp-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.8125rem;overflow-wrap:anywhere}
+.sp-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.75rem;opacity:.7;overflow-wrap:anywhere}
 .sp-link{color:inherit;font-weight:500;text-decoration:underline;text-underline-offset:.2em;text-decoration-thickness:1px;overflow-wrap:anywhere}
 .sp-link:hover{text-decoration-thickness:2px}
 .sp-runs{display:grid;gap:0}
-.sp-run{display:grid;grid-template-columns:10rem minmax(0,1fr) 5rem;gap:.75rem;align-items:baseline;padding:.6rem 0;border-top:1px solid var(--sp-line);font-size:.875rem;line-height:1.4}
+.sp-run{display:grid;grid-template-columns:6.5rem minmax(0,1fr) 6rem;gap:.75rem;align-items:start;padding:.6rem 0;border-top:1px solid var(--sp-line);font-size:.875rem;line-height:1.4}
 .sp-runs>.sp-run:first-child{border-top:0}
-.sp-run-end{text-align:right}
-.sp-run-meta{opacity:.8;font-size:.8125rem}
+.sp-run-end{justify-self:end}
+.sp-run-meta{opacity:.7;font-size:.75rem}
 .sp-cell{min-width:0;display:flex;flex-direction:column;gap:.15rem}
 `;
 
@@ -234,6 +234,10 @@
             stepClass(i) {
                 return { 'is-on': i === this.stepIndex, 'is-done': i < this.stepIndex };
             },
+
+            open(url) {
+                window.open(url, '_blank', 'noopener');
+            },
         },
 
         template: `
@@ -323,7 +327,7 @@
                         <span v-if="r.error" class="sp-run-meta">{{ r.error }}</span>
                         <span v-else-if="r.report" class="sp-run-meta">{{ r.report.pages }} sider, {{ r.report.files }} filer<template v-if="r.version_id"> · version {{ r.version_id.slice(0, 8) }}</template></span>
                     </div>
-                    <span class="sp-run-end"><a v-if="r.url" class="sp-link" :href="r.url" target="_blank" rel="noopener">Åbn</a></span>
+                    <span class="sp-run-end"><ui-button v-if="r.url" size="sm" variant="primary" text="Se side" @click="open(r.url)" /></span>
                 </div>
             </div>
         </ui-card-panel>
