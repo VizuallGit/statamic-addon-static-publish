@@ -19,6 +19,7 @@ class Verifier
         protected ?string $liveHost,
         protected int $maxFiles,
         protected int $maxFileBytes,
+        protected string $publicPath,
     ) {}
 
     /**
@@ -107,14 +108,22 @@ class Verifier
             }
         }
 
-        [$missingFiles, $missingPages] = $this->missing(array_keys($references));
+        [$missingFiles, $missingPages, $brokenLinks] = $this->missing(array_keys($references));
 
         foreach (array_slice($missingFiles, 0, 10) as $path) {
-            $errors[] = "{$path} bliver brugt på sitet, men er ikke med i kopien.";
+            $errors[] = "{$path} findes på sitet, men kom ikke med i kopien.";
         }
 
         if (($more = count($missingFiles) - 10) > 0) {
-            $errors[] = "… og {$more} filer mere mangler i kopien.";
+            $errors[] = "… og {$more} filer mere kom ikke med i kopien.";
+        }
+
+        foreach (array_slice($brokenLinks, 0, 10) as $path) {
+            $warnings[] = "{$path} bliver brugt på siderne, men filen findes ikke — heller ikke på PHP-sitet.";
+        }
+
+        if (($more = count($brokenLinks) - 10) > 0) {
+            $warnings[] = "… og {$more} filer mere mangler også på PHP-sitet.";
         }
 
         foreach (array_slice($missingPages, 0, 10) as $path) {
@@ -161,18 +170,21 @@ class Verifier
     }
 
     /**
-     * Splits the referenced paths into files the copy must contain (a font, a
-     * stylesheet, an image) and links to pages. A missing file breaks the page
-     * in the browser and stops the run. A missing page is a broken link and
-     * only a warning, because a link may point at a page left out on purpose.
+     * Sorts the referenced paths into three: files the copy lost, links to
+     * pages that are not in the copy, and references that are broken on the
+     * PHP site as well. Only the first stops the run, because only there does
+     * the copy differ from the site. A link may point at a page left out on
+     * purpose, and a reference that is already broken live is not made worse
+     * by publishing; both are reported as warnings.
      *
      * @param  list<string>  $paths
-     * @return array{0: list<string>, 1: list<string>}
+     * @return array{0: list<string>, 1: list<string>, 2: list<string>}
      */
     protected function missing(array $paths): array
     {
         $files = [];
         $pages = [];
+        $broken = [];
 
         sort($paths);
 
@@ -180,8 +192,14 @@ class Verifier
             $decoded = rawurldecode($path);
 
             if (preg_match('/\.[a-z0-9]{1,6}$/i', $path) && ! preg_match('/\.html?$/i', $path)) {
-                if (! is_file($this->dir.$decoded)) {
+                if (is_file($this->dir.$decoded)) {
+                    continue;
+                }
+
+                if (is_file(rtrim($this->publicPath, '/').$decoded)) {
                     $files[] = $path;
+                } else {
+                    $broken[] = $path;
                 }
 
                 continue;
@@ -192,7 +210,7 @@ class Verifier
             }
         }
 
-        return [$files, $pages];
+        return [$files, $pages, $broken];
     }
 
     /** Every path a page or a stylesheet points at: src/href/srcset and url(). */

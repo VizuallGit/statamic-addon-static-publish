@@ -75,6 +75,7 @@ class PublishCommand extends Command
                 parse_url($liveUrl, PHP_URL_HOST) ?: null,
                 (int) config('static-publish.limits.files'),
                 (int) config('static-publish.limits.file_bytes'),
+                public_path(),
             );
 
             $report = $verifier->verify($exporter->expectedUrls());
