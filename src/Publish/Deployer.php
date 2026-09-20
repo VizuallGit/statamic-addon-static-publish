@@ -36,7 +36,9 @@ class Deployer
             'assets' => [
                 'directory' => $buildDir,
                 'not_found_handling' => '404-page',
-                'html_handling' => 'auto-trailing-slash',
+                // Statamic's canonical URLs have no trailing slash: /om-os serves
+                // om-os/index.html directly, and /om-os/ redirects to /om-os.
+                'html_handling' => 'drop-trailing-slash',
             ],
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
