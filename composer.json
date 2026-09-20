@@ -1,0 +1,30 @@
+{
+    "name": "statamic-addon/static-publish",
+    "description": "Publish the whole site as static files on Cloudflare Workers — one button in the Control Panel, statamic/ssg underneath",
+    "type": "statamic-addon",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.2",
+        "statamic/cms": "^6.5",
+        "statamic/ssg": "^4.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Vizuall\\StaticPublish\\": "src/"
+        }
+    },
+    "extra": {
+        "statamic": {
+            "name": "Static Publish",
+            "description": "Publish the whole site as static files on Cloudflare Workers.",
+            "provider": "Vizuall\\StaticPublish\\AddonServiceProvider"
+        },
+        "laravel": {
+            "providers": [
+                "Vizuall\\StaticPublish\\AddonServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}

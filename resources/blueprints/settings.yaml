@@ -1,0 +1,37 @@
+tabs:
+  main:
+    display: Indstillinger
+    sections:
+      -
+        fields:
+          -
+            handle: mode
+            field:
+              type: select
+              display: Tilstand
+              instructions: 'Server: sitet kører som i dag, og der er ingen Udgiv-knap. Statisk site: utility-siden får en Udgiv-knap, der sender en statisk kopi af hele sitet til Cloudflare. Kontakten ændrer ikke andet.'
+              options:
+                server: Server
+                static: 'Statisk site'
+              default: server
+              clearable: false
+              multiple: false
+              searchable: false
+          -
+            handle: worker_name
+            field:
+              type: text
+              display: Worker-navn
+              instructions: 'Navnet på Workeren hos Cloudflare, fx vizuall-demo. Små bogstaver, tal og bindestreg.'
+              width: 50
+              validate:
+                - 'regex:/^[a-z0-9-]*$/'
+          -
+            handle: workers_subdomain
+            field:
+              type: text
+              display: workers.dev-underdomæne
+              instructions: 'Kontoens underdomæne fra Cloudflare-dashboardet (Workers & Pages → Overview). Live-adressen bliver https://{worker-navn}.{underdomæne}.workers.dev.'
+              width: 50
+              validate:
+                - 'regex:/^[a-z0-9-]*$/'
