@@ -8,6 +8,12 @@
         "statamic/cms": "^6.5",
         "statamic/ssg": "^4.1"
     },
+    "conflict": {
+        "statamic-addon/style-push": "<1.0.6"
+    },
+    "suggest": {
+        "statamic-addon/style-push": "style_push / script_push CSS and JS are written into every exported page (^1.0.6)"
+    },
     "autoload": {
         "psr-4": {
             "Vizuall\\StaticPublish\\": "src/"

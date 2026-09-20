@@ -21,6 +21,8 @@ use Symfony\Component\Finder\Finder;
  *  - base_url is the live URL, so absolute links point at Cloudflare;
  *  - `environment` is forced to `production` through Cascade::hydrated, so
  *    the layout's noindex tag is not written into the copy;
+ *  - CSS/JS pushed with style_push / script_push is written into each page
+ *    (PushedAssets), which the Style Push middleware would do on a request;
  *  - editor pages (entries whose template or layout matches one of the
  *    configured `editor_views` patterns, `skabelon_*` by default) are excluded;
  *  - files larger than Cloudflare's per-file limit are left out and reported.
@@ -54,6 +56,8 @@ class Exporter
         // Runs after the cascade has set `environment` from the app, so the
         // copy renders as production (no noindex) while the app stays as it is.
         Cascade::hydrated(fn ($cascade) => $cascade->set('environment', 'production'));
+
+        PushedAssets::listen();
 
         // The Generator singleton read its config when the console booted.
         // Build one from this run's config instead of the boot-time copy.

@@ -81,6 +81,10 @@ class Verifier
                 $errors[] = "{$relative} har noindex.";
             }
 
+            if (str_contains($text, '__YIELD_STYLES__') || str_contains($text, '__YIELD_SCRIPTS__')) {
+                $errors[] = "{$relative} har en tom style_push/script_push-pladsholder: sektionernes CSS/JS blev ikke sat ind.";
+            }
+
             if (str_contains($text, 'data-sid=') || str_contains($text, 'vendor/visual-editor')) {
                 $errors[] = "{$relative} indeholder spor af Visual Editor.";
             }
