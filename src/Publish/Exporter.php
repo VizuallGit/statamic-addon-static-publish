@@ -47,7 +47,7 @@ class Exporter
         config(['statamic.ssg' => array_merge(config('statamic.ssg', []), [
             'base_url' => $this->liveUrl,
             'destination' => $this->destination,
-            'copy' => [public_path('build') => 'build'],
+            'copy' => [],
             'symlinks' => [],
             'exclude' => $excluded,
             'failures' => 'errors',
@@ -66,7 +66,7 @@ class Exporter
 
         return [
             'excluded' => $excluded,
-            'skipped' => $this->copyAssets(),
+            'skipped' => array_merge($this->copyPublicPaths(), $this->copyAssets()),
         ];
     }
 
@@ -104,10 +104,52 @@ class Exporter
     }
 
     /**
+     * Copies the files and folders named in `public_paths` into the copy at
+     * the same path, because pages link to them by absolute URL: the Vite
+     * build (/build/…) and the uploaded fonts (/fonts/… in the @font-face
+     * rules the theme pushes). statamic/ssg's own `copy` is left empty so
+     * one method decides what comes along.
+     *
+     * @return list<array{path: string, bytes: int}>
+     */
+    protected function copyPublicPaths(): array
+    {
+        $skipped = [];
+
+        foreach ((array) config('static-publish.public_paths', []) as $path) {
+            $path = trim((string) $path, '/');
+            $source = public_path($path);
+
+            if ($path === '' || ! file_exists($source)) {
+                continue;
+            }
+
+            if (is_file($source)) {
+                $this->copyFile($source, "{$this->destination}/{$path}", "/{$path}", null, $skipped);
+
+                continue;
+            }
+
+            foreach ($this->filesIn($source) as $file) {
+                $relative = $file->getRelativePathname();
+
+                $this->copyFile(
+                    $file->getRealPath(),
+                    "{$this->destination}/{$path}/{$relative}",
+                    "/{$path}/{$relative}",
+                    $file->getSize(),
+                    $skipped,
+                );
+            }
+        }
+
+        return $skipped;
+    }
+
+    /**
      * Copies every public asset container into the copy under its URL, so
      * originals linked directly (video, svg, downloads) resolve. Hidden files
-     * and folders (.meta, .DS_Store) are metadata, not site content. Files
-     * over Cloudflare's per-file limit are left out and returned.
+     * and folders (.meta, .DS_Store) are metadata, not site content.
      *
      * @return list<array{path: string, bytes: int}>
      */
@@ -123,23 +165,42 @@ class Exporter
                 continue;
             }
 
-            $files = Finder::create()->files()->in($root)->ignoreDotFiles(true)->ignoreVCS(true);
-
-            foreach ($files as $file) {
+            foreach ($this->filesIn($root) as $file) {
                 $relative = $file->getRelativePathname();
-                $target = "{$this->destination}/{$url}/{$relative}";
 
-                if ($file->getSize() > $this->maxFileBytes) {
-                    $skipped[] = ['path' => "/{$url}/{$relative}", 'bytes' => $file->getSize()];
-
-                    continue;
-                }
-
-                File::ensureDirectoryExists(dirname($target));
-                File::copy($file->getRealPath(), $target);
+                $this->copyFile(
+                    $file->getRealPath(),
+                    "{$this->destination}/{$url}/{$relative}",
+                    "/{$url}/{$relative}",
+                    $file->getSize(),
+                    $skipped,
+                );
             }
         }
 
         return $skipped;
+    }
+
+    protected function filesIn(string $root): Finder
+    {
+        return Finder::create()->files()->in($root)->ignoreDotFiles(true)->ignoreVCS(true);
+    }
+
+    /**
+     * Copies one file into the copy, unless it is over Cloudflare's per-file
+     * limit; those are left out and reported by the caller.
+     */
+    protected function copyFile(string $source, string $target, string $url, ?int $size, array &$skipped): void
+    {
+        $size ??= (int) filesize($source);
+
+        if ($size > $this->maxFileBytes) {
+            $skipped[] = ['path' => $url, 'bytes' => $size];
+
+            return;
+        }
+
+        File::ensureDirectoryExists(dirname($target));
+        File::copy($source, $target);
     }
 }

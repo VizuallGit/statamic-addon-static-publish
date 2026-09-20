@@ -36,6 +36,14 @@ return [
         'file_bytes' => 25 * 1024 * 1024,
     ],
 
+    // Files and folders under public/ that pages link to by absolute URL and
+    // that the copy therefore needs: the Vite build and the uploaded fonts
+    // (/fonts/… in the theme's @font-face rules), plus the files a browser or
+    // a crawler asks for by name. Asset containers are copied automatically,
+    // and nothing else in public/ belongs on the static site. A file that is
+    // referenced but missing stops the run, so this list stays honest.
+    'public_paths' => ['build', 'fonts', 'favicon.ico', 'robots.txt'],
+
     // Views that make an entry an editor page rather than a page of the site:
     // the section galleries (get:preview_section) and the showcase layout
     // that always writes noindex. Matched against each entry's template and

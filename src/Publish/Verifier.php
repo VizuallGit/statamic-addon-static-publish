@@ -30,6 +30,7 @@ class Verifier
         $errors = [];
         $warnings = [];
         $hosts = [];
+        $references = [];
         $forms = 0;
         $pages = 0;
         $files = 0;
@@ -71,6 +72,14 @@ class Verifier
                 $errors[] = "{$relative} indeholder dev-adressen {$this->devHost}.";
             }
 
+            if ($ext === 'html' || $ext === 'htm' || $ext === 'css') {
+                foreach ($this->references($text, $ext) as $reference) {
+                    if ($path = $this->localPath($reference, dirname($relative))) {
+                        $references[$path] = true;
+                    }
+                }
+            }
+
             if ($ext !== 'html' && $ext !== 'htm') {
                 continue;
             }
@@ -96,6 +105,24 @@ class Verifier
             foreach ($this->externalHosts($text) as $host) {
                 $hosts[$host] = true;
             }
+        }
+
+        [$missingFiles, $missingPages] = $this->missing(array_keys($references));
+
+        foreach (array_slice($missingFiles, 0, 10) as $path) {
+            $errors[] = "{$path} bliver brugt på sitet, men er ikke med i kopien.";
+        }
+
+        if (($more = count($missingFiles) - 10) > 0) {
+            $errors[] = "… og {$more} filer mere mangler i kopien.";
+        }
+
+        foreach (array_slice($missingPages, 0, 10) as $path) {
+            $warnings[] = "Der linkes til {$path}, som ikke er med i kopien.";
+        }
+
+        if (($more = count($missingPages) - 10) > 0) {
+            $warnings[] = "… og {$more} links mere peger på sider, der ikke er med.";
         }
 
         if ($files > $this->maxFiles) {
@@ -131,6 +158,118 @@ class Verifier
         $path = rtrim($url, '/');
 
         return $this->dir.($path === '' ? '' : $path).'/index.html';
+    }
+
+    /**
+     * Splits the referenced paths into files the copy must contain (a font, a
+     * stylesheet, an image) and links to pages. A missing file breaks the page
+     * in the browser and stops the run. A missing page is a broken link and
+     * only a warning, because a link may point at a page left out on purpose.
+     *
+     * @param  list<string>  $paths
+     * @return array{0: list<string>, 1: list<string>}
+     */
+    protected function missing(array $paths): array
+    {
+        $files = [];
+        $pages = [];
+
+        sort($paths);
+
+        foreach ($paths as $path) {
+            $decoded = rawurldecode($path);
+
+            if (preg_match('/\.[a-z0-9]{1,6}$/i', $path) && ! preg_match('/\.html?$/i', $path)) {
+                if (! is_file($this->dir.$decoded)) {
+                    $files[] = $path;
+                }
+
+                continue;
+            }
+
+            if (! is_file($this->fileFor($decoded))) {
+                $pages[] = $path;
+            }
+        }
+
+        return [$files, $pages];
+    }
+
+    /** Every path a page or a stylesheet points at: src/href/srcset and url(). */
+    protected function references(string $text, string $ext): array
+    {
+        $found = [];
+
+        if ($ext !== 'css') {
+            preg_match_all('/\b(?:src|href|poster)\s*=\s*["\']([^"\']+)["\']/i', $text, $matches);
+            $found = $matches[1];
+
+            preg_match_all('/\bsrcset\s*=\s*["\']([^"\']+)["\']/i', $text, $matches);
+
+            foreach ($matches[1] as $set) {
+                foreach (explode(',', $set) as $candidate) {
+                    $found[] = (string) strtok(trim($candidate), ' ');
+                }
+            }
+        }
+
+        preg_match_all('/url\(\s*["\']?([^"\')]+)/i', $text, $matches);
+
+        return array_merge($found, $matches[1]);
+    }
+
+    /**
+     * The path inside the copy a reference points at, or null when it is not
+     * ours: another host, a data URI, an anchor, or one of Statamic's action
+     * routes, which the Worker answers rather than a file.
+     */
+    protected function localPath(string $reference, string $baseDir): ?string
+    {
+        $reference = trim($reference);
+
+        if ($reference === '' || preg_match('/^(data:|mailto:|tel:|javascript:|#)/i', $reference)) {
+            return null;
+        }
+
+        if (str_starts_with($reference, '//')) {
+            $reference = 'https:'.$reference;
+        }
+
+        if (preg_match('#^[a-z][a-z0-9+.-]*://#i', $reference)) {
+            if (strtolower((string) parse_url($reference, PHP_URL_HOST)) !== strtolower((string) $this->liveHost)) {
+                return null;
+            }
+
+            $reference = (string) parse_url($reference, PHP_URL_PATH);
+        }
+
+        $path = (string) strtok($reference, '?#');
+
+        if ($path === '' || str_starts_with($path, '/!/')) {
+            return null;
+        }
+
+        if (! str_starts_with($path, '/')) {
+            $path = '/'.trim($baseDir === '.' ? '' : $baseDir, '/').'/'.$path;
+        }
+
+        $parts = [];
+
+        foreach (explode('/', $path) as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+
+            if ($segment === '..') {
+                array_pop($parts);
+
+                continue;
+            }
+
+            $parts[] = $segment;
+        }
+
+        return '/'.implode('/', $parts);
     }
 
     /** Hosts in src/href other than the live site itself. */
