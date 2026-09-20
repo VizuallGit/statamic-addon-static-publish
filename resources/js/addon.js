@@ -28,7 +28,7 @@
     const STATUS = {
         running: { text: 'Kører', color: 'blue' },
         live: { text: 'Live', color: 'green' },
-        verified: { text: 'Kontrolleret, ikke sendt', color: 'default' },
+        verified: { text: 'Ikke sendt', color: 'default' },
         failed: { text: 'Fejlede', color: 'red' },
     };
 
@@ -39,7 +39,8 @@
 .sp-switch button[aria-pressed="true"]{background:var(--sp-accent);color:#fff}
 .sp-switch button:disabled{cursor:default;opacity:.6}
 .sp-row{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
-.sp-hint{font-size:.875rem;line-height:1.4;opacity:.8;max-width:40rem}
+.sp-hint{font-size:.875rem;line-height:1.4;max-width:40rem}
+.sp-note{font-size:.875rem;line-height:1.4}
 .sp-box{background:var(--sp-fill);border:1px solid var(--sp-line);border-radius:.75rem;padding:.9rem 1rem;display:grid;gap:.75rem}
 .sp-steps{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
 .sp-step{display:inline-flex;align-items:center;gap:.4em;font-size:.8125rem;padding:.3em .8em;border-radius:999px;border:1px solid var(--sp-line);opacity:.55}
@@ -48,13 +49,16 @@
 .sp-dot{width:.5em;height:.5em;border-radius:50%;background:currentColor;opacity:.4}
 .sp-step.is-on .sp-dot{opacity:1;background:var(--sp-accent);animation:sp-pulse 1s ease-in-out infinite}
 @keyframes sp-pulse{50%{opacity:.3}}
-.sp-list{margin:0;padding-inline-start:1.1rem;font-size:.8125rem;line-height:1.45}
-.sp-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.75rem;overflow-wrap:anywhere}
-.sp-link{color:var(--sp-accent);text-decoration:underline;text-underline-offset:.15em;overflow-wrap:anywhere}
+.sp-list{margin:0;padding-inline-start:1.1rem;font-size:.875rem;line-height:1.5}
+.sp-box-title{font-weight:600;font-size:.875rem}
+.sp-mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.8125rem;overflow-wrap:anywhere}
+.sp-link{color:inherit;font-weight:500;text-decoration:underline;text-underline-offset:.2em;text-decoration-thickness:1px;overflow-wrap:anywhere}
+.sp-link:hover{text-decoration-thickness:2px}
 .sp-runs{display:grid;gap:0}
-.sp-run{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:.75rem;align-items:center;padding:.5rem 0;border-top:1px solid var(--sp-line);font-size:.8125rem}
+.sp-run{display:grid;grid-template-columns:10rem minmax(0,1fr) 5rem;gap:.75rem;align-items:baseline;padding:.6rem 0;border-top:1px solid var(--sp-line);font-size:.875rem;line-height:1.4}
 .sp-runs>.sp-run:first-child{border-top:0}
-.sp-run-meta{opacity:.75}
+.sp-run-end{text-align:right}
+.sp-run-meta{opacity:.8;font-size:.8125rem}
 .sp-cell{min-width:0;display:flex;flex-direction:column;gap:.15rem}
 `;
 
@@ -264,19 +268,19 @@
                 <ui-button variant="primary" icon="upload-cloud"
                     :text="running ? 'Udgiver…' : ((starting || pending) ? 'Starter…' : 'Udgiv')"
                     :disabled="!ready || starting || pending || !!running" @click="publish" />
-                <ui-text v-if="!running && latest && latest.status === 'live'" size="sm" variant="subtle">
+                <span v-if="!running && latest && latest.status === 'live'" class="sp-note">
                     Sidst udgivet {{ when(latest.finished_at) }}<template v-if="latest.user"> af {{ latest.user }}</template>.
-                </ui-text>
+                </span>
             </div>
 
             <div v-if="running" class="sp-box" style="margin-top:1rem">
                 <div class="sp-steps">
                     <span v-for="(s, i) in steps" :key="s.key" class="sp-step" :class="stepClass(i)"><span class="sp-dot"></span>{{ s.text }}</span>
-                    <ui-text size="sm" variant="subtle" :text="seconds(elapsed)" />
+                    <span class="sp-note">{{ seconds(elapsed) }}</span>
                 </div>
-                <ui-text size="sm" variant="subtle">
+                <span class="sp-note">
                     Startet {{ when(running.started_at) }}<template v-if="running.user"> af {{ running.user }}</template>. Siden opdaterer sig selv.
-                </ui-text>
+                </span>
             </div>
 
             <template v-else-if="latest">
@@ -295,15 +299,15 @@
 
                 <div v-if="latest.report && (latest.report.warnings.length || latest.report.external_hosts.length || (latest.report.excluded || []).length)" class="sp-box" style="margin-top:.75rem">
                     <template v-if="latest.report.warnings.length">
-                        <ui-text size="sm" text="Bemærk" />
+                        <span class="sp-box-title">Bemærk</span>
                         <ul class="sp-list"><li v-for="w in latest.report.warnings" :key="w">{{ w }}</li></ul>
                     </template>
                     <template v-if="(latest.report.excluded || []).length">
-                        <ui-text size="sm" text="Udeladt (redaktørsider)" />
+                        <span class="sp-box-title">Udeladt (redaktørsider)</span>
                         <span class="sp-mono">{{ latest.report.excluded.join(', ') }}</span>
                     </template>
                     <template v-if="latest.report.external_hosts.length">
-                        <ui-text size="sm" text="Eksterne hosts på siderne" />
+                        <span class="sp-box-title">Eksterne hosts på siderne</span>
                         <span class="sp-mono">{{ latest.report.external_hosts.join(', ') }}</span>
                     </template>
                 </div>
@@ -313,14 +317,13 @@
         <ui-card-panel v-if="runs.length" heading="Seneste kørsler">
             <div class="sp-runs">
                 <div v-for="r in runs" :key="r.id" class="sp-run">
-                    <ui-badge :text="badge(r).text" :color="badge(r).color" size="sm" />
+                    <span><ui-badge :text="badge(r).text" :color="badge(r).color" size="sm" /></span>
                     <div class="sp-cell">
                         <span>{{ when(r.started_at) }}<template v-if="r.user"> · {{ r.user }}</template><template v-if="r.duration !== null"> · {{ seconds(r.duration) }}</template></span>
                         <span v-if="r.error" class="sp-run-meta">{{ r.error }}</span>
                         <span v-else-if="r.report" class="sp-run-meta">{{ r.report.pages }} sider, {{ r.report.files }} filer<template v-if="r.version_id"> · version {{ r.version_id.slice(0, 8) }}</template></span>
                     </div>
-                    <a v-if="r.url" class="sp-link" :href="r.url" target="_blank" rel="noopener">Åbn</a>
-                    <span v-else></span>
+                    <span class="sp-run-end"><a v-if="r.url" class="sp-link" :href="r.url" target="_blank" rel="noopener">Åbn</a></span>
                 </div>
             </div>
         </ui-card-panel>
