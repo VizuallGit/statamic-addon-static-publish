@@ -27,6 +27,7 @@
 
     const STATUS = {
         running: { text: 'Kører', color: 'blue' },
+        rollback: { text: 'Rullet tilbage', color: 'default' },
         live: { text: 'Live', color: 'green' },
         verified: { text: 'Ikke sendt', color: 'default' },
         failed: { text: 'Fejlede', color: 'red' },
@@ -55,7 +56,9 @@
 .sp-link{color:inherit;font-weight:500;text-decoration:underline;text-underline-offset:.2em;text-decoration-thickness:1px;overflow-wrap:anywhere}
 .sp-link:hover{text-decoration-thickness:2px}
 .sp-runs{display:grid;gap:0}
-.sp-run{display:grid;grid-template-columns:6.5rem minmax(0,1fr) 6rem;gap:.75rem;align-items:center;padding:.6rem 0;border-top:1px solid var(--sp-line);font-size:.875rem;line-height:1.4}
+.sp-run{display:grid;grid-template-columns:6.5rem minmax(0,1fr) auto;gap:.75rem;align-items:center;padding:.6rem 0;border-top:1px solid var(--sp-line);font-size:.875rem;line-height:1.4}
+.sp-run-end{display:flex;gap:.4rem;align-items:center}
+.sp-facts{display:grid;gap:.35rem;margin-top:.9rem}
 .sp-runs>.sp-run:first-child{border-top:0}
 .sp-run-end{justify-self:end}
 .sp-run-meta{opacity:.7;font-size:.75rem}
@@ -115,6 +118,7 @@
                 runs: [],
                 switching: false,
                 starting: false,
+                rollingBack: '',
                 elapsed: 0,
                 timer: null,
                 clock: null,
@@ -137,6 +141,15 @@
             stepIndex() {
                 if (!this.running) return -1;
                 return STEPS.findIndex(s => s.key === this.running.step);
+            },
+            // The newest run that reached Cloudflare. Everything older can be
+            // rolled back to; this one already is what visitors see.
+            liveVersion() {
+                const run = this.runs.find(r => r.status === 'live' && r.version_id);
+                return run ? run.version_id : null;
+            },
+            forms() {
+                return (this.settings && this.settings.forms) || null;
             },
         },
 
@@ -210,6 +223,31 @@
                 }
             },
 
+            async rollback(run) {
+                const label = when(run.started_at);
+
+                if (this.rollingBack || this.running) return;
+                if (!window.confirm('Sæt udgaven fra ' + label + ' live igen? Den nuværende udgave forsvinder fra sitet, men bliver liggende i historikken.')) return;
+
+                this.rollingBack = run.version_id;
+                this.error = '';
+
+                try {
+                    this.lastId = this.runs[0] ? this.runs[0].id : null;
+                    await this.call('rollback', { method: 'POST', body: JSON.stringify({ version_id: run.version_id }) });
+                    this.pending = true;
+                    this.startPolling();
+                } catch (e) {
+                    this.error = e.message;
+                } finally {
+                    this.rollingBack = '';
+                }
+            },
+
+            canRollback(run) {
+                return run.version_id && run.status === 'live' && run.version_id !== this.liveVersion;
+            },
+
             startPolling() {
                 if (this.timer) return;
                 this.timer = setInterval(() => this.load(), 2000);
@@ -228,6 +266,7 @@
             },
 
             badge(run) {
+                if (run.kind === 'rollback' && run.status === 'live') return STATUS.rollback;
                 return STATUS[run.status] || { text: run.status, color: 'default' };
             },
 
@@ -276,6 +315,21 @@
                     Sidst udgivet {{ when(latest.finished_at) }}<template v-if="latest.user"> af {{ latest.user }}</template>.
                 </span>
             </div>
+
+            <div class="sp-facts">
+                <span v-if="forms && forms.enabled && !forms.problem" class="sp-note">
+                    Formularer på det statiske site sendes videre til <span class="sp-mono">{{ forms.cms_origin }}</span> og gemmes her som altid.
+                </span>
+                <span v-else-if="forms && !forms.enabled" class="sp-note">
+                    Formularer virker ikke på det statiske site.
+                    <a v-if="settings.settings_url" class="sp-link" :href="settings.settings_url">Slå dem til i indstillingerne</a>, hvis siderne har en formular.
+                </span>
+                <span v-if="settings.nightly" class="sp-note">
+                    Udgiver også automatisk kl. {{ settings.nightly_at }}, hvis en entrys dato er blevet aktuel siden sidst.
+                </span>
+            </div>
+
+            <ui-alert v-if="forms && forms.enabled && forms.problem" variant="warning" :text="forms.problem" style="margin-top:.75rem" />
 
             <div v-if="running" class="sp-box" style="margin-top:1rem">
                 <div class="sp-steps">
@@ -327,7 +381,12 @@
                         <span v-if="r.error" class="sp-run-meta">{{ r.error }}</span>
                         <span v-else-if="r.report" class="sp-run-meta">{{ r.report.pages }} sider, {{ r.report.files }} filer<template v-if="r.version_id"> · version {{ r.version_id.slice(0, 8) }}</template></span>
                     </div>
-                    <span class="sp-run-end"><ui-button v-if="r.url" size="sm" variant="primary" text="Se side" @click="open(r.url)" /></span>
+                    <span class="sp-run-end">
+                        <ui-button v-if="canRollback(r)" size="sm" variant="ghost"
+                            :text="rollingBack === r.version_id ? 'Ruller…' : 'Rul tilbage'"
+                            :disabled="!!running || !!rollingBack" @click="rollback(r)" />
+                        <ui-button v-if="r.url" size="sm" variant="primary" text="Se side" @click="open(r.url)" />
+                    </span>
                 </div>
             </div>
         </ui-card-panel>

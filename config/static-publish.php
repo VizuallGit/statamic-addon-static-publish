@@ -19,6 +19,19 @@ return [
         'account_id' => env('CLOUDFLARE_ACCOUNT_ID'),
     ],
 
+    // The secret the Worker proves itself with when it forwards a form
+    // submission. Left empty it is derived from APP_KEY, which is already a
+    // per-site secret outside git; see Publish\Forms::secret(). Set this only
+    // when two installations must share one secret, for instance when the
+    // copy is published from somewhere other than the CMS it points at.
+    'form_secret' => env('STATIC_PUBLISH_FORM_SECRET'),
+
+    // Submissions a single visitor may send per minute from the static site,
+    // matching Statamic's own limit on its form route. Counted in
+    // Http\Middleware\VerifyStaticFormRequest, on the address the Worker
+    // reports rather than Cloudflare's own.
+    'form_rate_limit' => 10,
+
     // wrangler is run through npx with a pinned major, so the site's
     // package.json is not touched. Override the binaries when the web
     // server's PATH does not know them.
@@ -50,6 +63,11 @@ return [
     // layout name; `*` is a wildcard. Such entries are left out of the copy.
     'editor_views' => ['skabelon_*'],
 
-    // How many runs the utility page lists.
-    'history' => 5,
+    // How many runs the utility page lists, each with its own roll-back
+    // button while Cloudflare still holds that version.
+    'history' => 10,
+
+    // Publishes at this time of night when the nightly setting is on, so an
+    // entry dated for tomorrow morning is live before anyone reads it.
+    'nightly_at' => '03:00',
 ];

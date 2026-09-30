@@ -5,11 +5,14 @@ namespace Vizuall\StaticPublish\Console;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Statamic\Console\RunsInPlease;
+use Statamic\Facades\Entry;
 use Statamic\StaticSite\GenerationFailedException;
 use Throwable;
 use Vizuall\StaticPublish\Publish\Deployer;
 use Vizuall\StaticPublish\Publish\Exporter;
+use Vizuall\StaticPublish\Publish\Forms;
 use Vizuall\StaticPublish\Publish\RunLog;
+use Vizuall\StaticPublish\Publish\Transformer;
 use Vizuall\StaticPublish\Publish\Verifier;
 use Vizuall\StaticPublish\Settings;
 use Wilderborn\Partyline\Facade as Partyline;
@@ -26,6 +29,7 @@ class PublishCommand extends Command
 
     protected $signature = 'static-publish:publish
         {--no-deploy : Generér og kontrollér kopien, men send den ikke til Cloudflare}
+        {--if-due : Udgiv kun, hvis en entrys dato er passeret siden seneste vellykkede udgivelse}
         {--user= : ID på den bruger der startede kørslen fra Control Panelet}';
 
     protected $description = 'Udgiv hele sitet som statiske filer på Cloudflare Workers';
@@ -44,6 +48,18 @@ class PublishCommand extends Command
             $this->error('CLOUDFLARE_API_TOKEN og CLOUDFLARE_ACCOUNT_ID mangler i .env.');
 
             return self::FAILURE;
+        }
+
+        if (Forms::enabled() && $problem = Forms::problem()) {
+            $this->error($problem);
+
+            return self::FAILURE;
+        }
+
+        if ($this->option('if-due') && ! $this->isDue($log)) {
+            $this->info('Ingen entry er blevet aktuel siden seneste udgivelse. Intet at gøre.');
+
+            return self::SUCCESS;
         }
 
         $lock = Cache::lock('static-publish', 1800);
@@ -66,6 +82,11 @@ class PublishCommand extends Command
             $this->line('Genererer…');
             $exported = $exporter->run();
 
+            if (Forms::enabled()) {
+                $transformed = (new Transformer($destination, Forms::successText()))->run();
+                $this->line("  Formular-script lagt på {$transformed} ".($transformed === 1 ? 'side' : 'sider').'.');
+            }
+
             $run = $log->step($run, 'verifying');
             $this->line('Tjekker…');
 
@@ -76,6 +97,7 @@ class PublishCommand extends Command
                 (int) config('static-publish.limits.files'),
                 (int) config('static-publish.limits.file_bytes'),
                 public_path(),
+                Forms::enabled(),
             );
 
             $report = $verifier->verify($exporter->expectedUrls());
@@ -127,7 +149,13 @@ class PublishCommand extends Command
             $run = $log->step($run, 'deploying');
             $this->line('Uploader til Cloudflare…');
 
-            $deployer = new Deployer(Settings::workerName(), Settings::apiToken(), Settings::accountId());
+            $deployer = new Deployer(
+                Settings::workerName(),
+                Settings::apiToken(),
+                Settings::accountId(),
+                Forms::enabled() ? Forms::cmsOrigin() : null,
+                Forms::enabled() ? Forms::secret() : null,
+            );
             $deployed = $deployer->deploy($destination, $run['id'], fn ($text) => $this->output->write($text));
 
             $log->finish($run, RunLog::LIVE, [
@@ -153,5 +181,22 @@ class PublishCommand extends Command
         } finally {
             $lock->release();
         }
+    }
+
+    /**
+     * Whether tonight's run has anything to do. An entry dated for a moment
+     * that has now passed became a page of the site without anyone touching
+     * it, and only that is worth waking Cloudflare for. An ordinary edit is
+     * published with the button, by the person who made it.
+     */
+    protected function isDue(RunLog $log): bool
+    {
+        if (! $since = $log->lastPublishedAt()) {
+            return true;
+        }
+
+        return Entry::all()
+            ->filter(fn ($entry) => $entry->published() && $entry->uri() !== null && $entry->hasDate())
+            ->contains(fn ($entry) => $entry->date()->gt($since) && $entry->date()->lte(now()));
     }
 }

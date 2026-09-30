@@ -24,6 +24,10 @@ class RunLog
 
     public const STEPS = ['generating', 'verifying', 'deploying', 'done'];
 
+    public const PUBLISH = 'publish';
+
+    public const ROLLBACK = 'rollback';
+
     protected string $dir;
 
     public function __construct(?string $dir = null)
@@ -31,14 +35,15 @@ class RunLog
         $this->dir = $dir ?? config('static-publish.runs');
     }
 
-    public function start(?string $user, bool $deploy): array
+    public function start(?string $user, bool $deploy, string $kind = self::PUBLISH): array
     {
         File::ensureDirectoryExists($this->dir);
 
         $run = [
             'id' => now()->format('Ymd-His').'-'.bin2hex(random_bytes(2)),
+            'kind' => $kind,
             'status' => self::RUNNING,
-            'step' => 'generating',
+            'step' => $kind === self::ROLLBACK ? 'deploying' : 'generating',
             'deploy' => $deploy,
             'user' => $user,
             'pid' => getmypid(),
@@ -155,4 +160,21 @@ class RunLog
         File::put($tmp, json_encode($run, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
         rename($tmp, $path);
     }
+
+    /**
+     * When the site last went live, whether by a publish or a roll-back.
+     * The nightly run measures from here: anything that became current after
+     * this moment is not on the live site yet.
+     */
+    public function lastPublishedAt(): ?\Illuminate\Support\Carbon
+    {
+        foreach ($this->recent(50) as $run) {
+            if ($run['status'] === self::LIVE && ! empty($run['finished_at'])) {
+                return \Illuminate\Support\Carbon::parse($run['finished_at']);
+            }
+        }
+
+        return null;
+    }
+
 }

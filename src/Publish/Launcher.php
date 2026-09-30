@@ -7,13 +7,15 @@ use RuntimeException;
 use Symfony\Component\Process\PhpExecutableFinder;
 
 /**
- * Starts `please static-publish:publish` detached from the web request, so
- * the Control Panel gets its answer at once and follows the run through the
- * run log. Its console output lands in storage/app/static-publish/console.log.
+ * Starts one of the addon's commands detached from the web request, so the
+ * Control Panel gets its answer at once and follows the work through the run
+ * log rather than holding a connection open for a minute. The console output
+ * lands in storage/app/static-publish/console.log.
  */
 class Launcher
 {
-    public static function start(?string $userId): void
+    /** @param list<string> $arguments */
+    public static function start(string $command, array $arguments, ?string $userId): void
     {
         $php = config('static-publish.php') ?: (new PhpExecutableFinder)->find(false);
 
@@ -24,14 +26,12 @@ class Launcher
         $log = storage_path('app/static-publish/console.log');
         File::ensureDirectoryExists(dirname($log));
 
-        $command = sprintf(
-            'nohup %s %s static-publish:publish --no-interaction --user=%s > %s 2>&1 &',
-            escapeshellarg($php),
-            escapeshellarg(base_path('please')),
-            escapeshellarg((string) $userId),
-            escapeshellarg($log)
-        );
+        $parts = array_map('escapeshellarg', array_merge(
+            [$php, base_path('please'), $command],
+            $arguments,
+            ['--no-interaction', '--user='.$userId]
+        ));
 
-        exec($command);
+        exec('nohup '.implode(' ', $parts).' > '.escapeshellarg($log).' 2>&1 &');
     }
 }

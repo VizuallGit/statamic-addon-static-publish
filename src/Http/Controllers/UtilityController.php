@@ -52,7 +52,37 @@ class UtilityController
             return response()->json(['error' => 'En udgivelse kører allerede.'], 409);
         }
 
-        Launcher::start(User::current()?->id());
+        Launcher::start('static-publish:publish', [], User::current()?->id());
+
+        return response()->json(['started' => true]);
+    }
+
+    /**
+     * Puts an earlier version back. The version must be one this site
+     * published: Cloudflare would accept any version of the Worker, including
+     * one deployed by something else entirely, and the run log is the only
+     * record of which versions were ours.
+     */
+    public function rollback(Request $request, RunLog $log): JsonResponse
+    {
+        $version = (string) $request->input('version_id');
+
+        $known = collect($log->recent(200))
+            ->contains(fn ($run) => $run['version_id'] === $version && $run['status'] === RunLog::LIVE);
+
+        if (! $known) {
+            return response()->json(['error' => 'Den version findes ikke i historikken.'], 422);
+        }
+
+        if (! Settings::hasCredentials()) {
+            return response()->json(['error' => 'CLOUDFLARE_API_TOKEN og CLOUDFLARE_ACCOUNT_ID mangler i .env.'], 422);
+        }
+
+        if ($log->running()) {
+            return response()->json(['error' => 'En udgivelse kører allerede.'], 409);
+        }
+
+        Launcher::start('static-publish:rollback', [$version], User::current()?->id());
 
         return response()->json(['started' => true]);
     }
@@ -74,6 +104,7 @@ class UtilityController
 
         return [
             'id' => $run['id'],
+            'kind' => $run['kind'] ?? RunLog::PUBLISH,
             'status' => $run['status'],
             'step' => $run['step'],
             'deploy' => $run['deploy'],

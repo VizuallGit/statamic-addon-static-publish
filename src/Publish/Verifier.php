@@ -20,6 +20,7 @@ class Verifier
         protected int $maxFiles,
         protected int $maxFileBytes,
         protected string $publicPath,
+        protected bool $formsEnabled = false,
     ) {}
 
     /**
@@ -99,8 +100,12 @@ class Verifier
                 $errors[] = "{$relative} indeholder spor af Visual Editor.";
             }
 
-            if (preg_match('/<form\b[^>]*action=["\'][^"\']*\/!\/forms\//i', $text)) {
+            if (Transformer::hasForm($text)) {
                 $forms++;
+
+                if ($this->formsEnabled && ! str_contains($text, Forms::SCRIPT_PATH)) {
+                    $errors[] = "{$relative} har en formular, men mangler formular-scriptet.";
+                }
             }
 
             foreach ($this->externalHosts($text) as $host) {
@@ -138,8 +143,9 @@ class Verifier
             $errors[] = "Kopien har {$files} filer. Cloudflares grænse er {$this->maxFiles}.";
         }
 
-        if ($forms > 0) {
-            $warnings[] = "{$forms} ".($forms === 1 ? 'side har en formular' : 'sider har formularer').'. Formularer virker først i trin 2.';
+        if ($forms > 0 && ! $this->formsEnabled) {
+            $warnings[] = "{$forms} ".($forms === 1 ? 'side har en formular' : 'sider har formularer')
+                .', men Formularer er slået fra i indstillingerne. De vil ikke kunne sendes fra det statiske site.';
         }
 
         return $this->report($errors, $warnings, $hosts, $pages, $files, $bytes, $forms);

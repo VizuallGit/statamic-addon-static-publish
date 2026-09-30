@@ -5,6 +5,7 @@ namespace Vizuall\StaticPublish;
 use RuntimeException;
 use Statamic\Addons\Addon;
 use Statamic\Facades\Addon as Addons;
+use Vizuall\StaticPublish\Publish\Forms;
 
 /**
  * The addon's settings (resources/addons/static-publish.yaml, edited on the
@@ -64,6 +65,27 @@ class Settings
         return ($name !== '' && $subdomain !== '') ? "https://{$name}.{$subdomain}.workers.dev" : null;
     }
 
+    public static function formsEnabled(): bool
+    {
+        return (bool) self::addon()->setting('forms', false);
+    }
+
+    /** The address the Worker forwards a submission to. Empty means this installation. */
+    public static function cmsOrigin(): string
+    {
+        return rtrim(trim((string) self::addon()->setting('cms_origin', '')), '/');
+    }
+
+    public static function formSuccessText(): string
+    {
+        return trim((string) self::addon()->setting('form_success_text', ''));
+    }
+
+    public static function nightlyEnabled(): bool
+    {
+        return (bool) self::addon()->setting('nightly', false);
+    }
+
     public static function apiToken(): string
     {
         return (string) config('static-publish.cloudflare.api_token', '');
@@ -89,6 +111,13 @@ class Settings
             'live_url' => self::liveUrl(),
             'credentials' => self::hasCredentials(),
             'settings_url' => self::addon()->settingsUrl(),
+            'nightly' => self::nightlyEnabled(),
+            'nightly_at' => (string) config('static-publish.nightly_at', '03:00'),
+            'forms' => [
+                'enabled' => self::formsEnabled(),
+                'cms_origin' => Forms::cmsOrigin(),
+                'problem' => self::formsEnabled() ? Forms::problem() : null,
+            ],
         ];
     }
 }

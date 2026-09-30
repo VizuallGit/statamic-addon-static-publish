@@ -35,3 +35,40 @@ tabs:
               width: 50
               validate:
                 - 'regex:/^[a-z0-9-]*$/'
+      -
+        display: Formularer
+        instructions: 'Et statisk site kan ikke selv tage imod en formular. Slås dette til, får Workeren et lille script, der sender indsendelsen videre til dette CMS, som gemmer den og sender mails som altid. Kræver at CMS''et kan nås udefra på adressen herunder.'
+        fields:
+          -
+            handle: forms
+            field:
+              type: toggle
+              display: 'Formularer på det statiske site'
+              instructions: 'Slået fra udgives sitet som rene filer, og en formular på siden gør ingenting. Slået til sendes indsendelser videre til dette CMS.'
+          -
+            handle: cms_origin
+            field:
+              type: text
+              display: 'CMS-adresse'
+              instructions: 'Den adresse Workeren sender indsendelser til, fx https://cms.kunde.dk. Står den tom, bruges sitets egen adresse (APP_URL). Uden sti til sidst.'
+              placeholder: 'https://cms.kunde.dk'
+              if:
+                forms: 'equals true'
+          -
+            handle: form_success_text
+            field:
+              type: text
+              display: 'Tekst efter indsendelse'
+              instructions: 'Vises i stedet for formularen, når der ikke er sat en takkeside op på selve formularen.'
+              placeholder: 'Tak for din besked. Vi vender tilbage hurtigst muligt.'
+              if:
+                forms: 'equals true'
+      -
+        display: 'Natlig udgivelse'
+        fields:
+          -
+            handle: nightly
+            field:
+              type: toggle
+              display: 'Udgiv automatisk om natten'
+              instructions: 'En entry med en dato frem i tiden bliver til en side af sig selv, uden at nogen trykker på noget. Er dette slået til, udgives sitet kl. 03, men kun hvis en sådan dato er passeret siden sidste udgivelse. Almindelige rettelser udgives med knappen.'

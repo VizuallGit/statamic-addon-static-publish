@@ -2,10 +2,12 @@
 
 namespace Vizuall\StaticPublish;
 
+use Illuminate\Console\Scheduling\Schedule;
 use Statamic\Facades\Utility;
 use Statamic\Providers\AddonServiceProvider as BaseAddonServiceProvider;
 use Statamic\Statamic;
 use Vizuall\StaticPublish\Console\PublishCommand;
+use Vizuall\StaticPublish\Console\RollbackCommand;
 use Vizuall\StaticPublish\Http\Controllers\UtilityController;
 
 /**
@@ -25,6 +27,7 @@ class AddonServiceProvider extends BaseAddonServiceProvider
 
     protected $commands = [
         PublishCommand::class,
+        RollbackCommand::class,
     ];
 
     /**
@@ -57,6 +60,22 @@ class AddonServiceProvider extends BaseAddonServiceProvider
                 $router->get('state', [UtilityController::class, 'state']);
                 $router->post('mode', [UtilityController::class, 'mode']);
                 $router->post('publish', [UtilityController::class, 'publish']);
+                $router->post('rollback', [UtilityController::class, 'rollback']);
             });
+
+    }
+
+    /**
+     * An entry dated for tomorrow morning becomes a page of the site without
+     * anyone touching it, and a static copy would not know. This puts one
+     * run in the night, and only when the setting is on — read at run time,
+     * so turning it off in the Control Panel takes effect the same night.
+     */
+    protected function schedule(Schedule $schedule)
+    {
+        $schedule->command('static-publish:publish --if-due')
+            ->dailyAt((string) config('static-publish.nightly_at', '03:00'))
+            ->when(fn () => \Vizuall\StaticPublish\Settings::nightlyEnabled())
+            ->withoutOverlapping();
     }
 }
