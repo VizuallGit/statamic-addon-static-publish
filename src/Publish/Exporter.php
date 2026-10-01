@@ -5,6 +5,7 @@ namespace Vizuall\StaticPublish\Publish;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\File;
+use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Statamic\Facades\AssetContainer;
 use Statamic\Facades\Cascade;
@@ -25,6 +26,8 @@ use Symfony\Component\Finder\Finder;
  *    (PushedAssets), which the Style Push middleware would do on a request;
  *  - editor pages (entries whose template or layout matches one of the
  *    configured `editor_views` patterns, `skabelon_*` by default) are excluded;
+ *  - pages the site answers with PHP but the copy needs as files (sitemap,
+ *    robots.txt, Cloudflare's `_redirects`) are fetched and written;
  *  - files larger than Cloudflare's per-file limit are left out and reported.
  */
 class Exporter
@@ -64,10 +67,80 @@ class Exporter
         $generator = new Generator(app(), app(Filesystem::class), app(Router::class), app(Tasks::class));
         $generator->generate();
 
+        $this->writeGeneratedPages();
+
         return [
             'excluded' => $excluded,
             'skipped' => array_merge($this->copyPublicPaths(), $this->copyAssets()),
         ];
+    }
+
+    /**
+     * Asks this site for each `generated_pages` path and writes the answer
+     * into the copy under the same name.
+     *
+     * Through the router rather than the HTTP kernel: the run is already
+     * inside a request, and handling a second one through the kernel would
+     * rebuild global state the generator is standing on — including the
+     * forced production environment above.
+     *
+     * A path that does not answer 200 is left out rather than written as an
+     * error page. A missing sitemap is a site search engines re-crawl later;
+     * a sitemap that is a 404 page is one they learn to distrust.
+     *
+     * @return list<string> the paths written
+     */
+    protected function writeGeneratedPages(): array
+    {
+        $written = [];
+
+        // The same promise the cascade override above makes, for code that
+        // reads the app instead of the cascade: a robots.txt built by a route
+        // must not say `Disallow: /` because the server that published runs
+        // as `local`. Restored afterwards — this process may do more work.
+        $env = app()['env'];
+        app()['env'] = 'production';
+
+        try {
+            $written = $this->fetchGeneratedPages();
+        } finally {
+            app()['env'] = $env;
+        }
+
+        return $written;
+    }
+
+    /** @return list<string> */
+    protected function fetchGeneratedPages(): array
+    {
+        $written = [];
+
+        foreach ((array) config('static-publish.generated_pages', []) as $path) {
+            $path = trim((string) $path, '/');
+
+            if ($path === '') {
+                continue;
+            }
+
+            try {
+                $response = app(Router::class)->dispatch(Request::create($this->liveUrl.'/'.$path, 'GET'));
+            } catch (\Throwable) {
+                continue;
+            }
+
+            if ($response->getStatusCode() !== 200) {
+                continue;
+            }
+
+            $target = "{$this->destination}/{$path}";
+
+            File::ensureDirectoryExists(dirname($target));
+            File::put($target, $response->getContent());
+
+            $written[] = $path;
+        }
+
+        return $written;
     }
 
     /** Relative URLs of the published entries the static site must contain. */

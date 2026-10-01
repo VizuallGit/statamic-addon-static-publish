@@ -200,7 +200,28 @@ Kræver Laravel-scheduleren på serveren (`schedule:run` hvert minut).
   standard `skabelon_*`). De er værktøjer i CMS'et, ikke sider på sitet.
 - Filer over Cloudflares grænse på 25 MiB. De nævnes i advarslerne.
 - Alt i `public/` som ikke står i `public_paths` (`build`, `fonts`,
-  `favicon.ico`, `robots.txt`). Asset-containere kopieres altid.
+  `favicon.ico`). Asset-containere kopieres altid.
+
+### Sider sitet laver med PHP
+
+Det statiske site kører ingen PHP, så en sitemap, en robots.txt eller et
+redirect-kort bygget af en rute ville slet ikke findes derude. `generated_pages`
+i config siger hvilke adresser der skal hentes fra sitet, når siderne er
+skrevet, og gemmes som filer under samme navn — som standard:
+
+| Fil | Hvad |
+|---|---|
+| `sitemap.xml` | Sitets sitemap, som sitet bygger den |
+| `robots.txt` | Peger på sitemappen, med sitets eget domæne |
+| `_redirects` | Cloudflares eget redirect-format. Omdirigeringerne sker på kanten, uden at noget kører |
+
+Sitet ejer hvad de siger; listen her siger kun at de skal med. Svarer en adresse
+ikke 200, springes den over — en manglende sitemap henter søgemaskinerne igen
+senere, mens en sitemap der *er* en fejlside lærer dem at lade være.
+
+Mens de hentes, kører appen som `production`, ligesom cascaden gør under
+renderingen: ellers kunne en robots.txt bygget på en server i `local` komme til
+at sige `Disallow: /` på det udgivne site.
 
 ## Filer og logs
 

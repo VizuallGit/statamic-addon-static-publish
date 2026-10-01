@@ -55,7 +55,17 @@ return [
     // a crawler asks for by name. Asset containers are copied automatically,
     // and nothing else in public/ belongs on the static site. A file that is
     // referenced but missing stops the run, so this list stays honest.
-    'public_paths' => ['build', 'fonts', 'favicon.ico', 'robots.txt'],
+    'public_paths' => ['build', 'fonts', 'favicon.ico'],
+
+    // Paths the site answers with PHP that the copy must hold as files.
+    // The static site runs no PHP, so a sitemap, a robots.txt or a redirect
+    // map built by a route would simply not exist out there. Each is fetched
+    // from this site once the pages are written and saved under the same
+    // name. The site owns what they say; this list only says to bring them.
+    //
+    // `_redirects` is Cloudflare's own redirect file: it answers them from
+    // the edge, with no code running at all.
+    'generated_pages' => ['sitemap.xml', 'robots.txt', '_redirects'],
 
     // Views that make an entry an editor page rather than a page of the site:
     // the section galleries (get:preview_section) and the showcase layout
