@@ -67,11 +67,16 @@ class Exporter
         $generator = new Generator(app(), app(Filesystem::class), app(Router::class), app(Tasks::class));
         $generator->generate();
 
+        // Copies first, generated pages after: a site that answers /robots.txt
+        // with a route must win over a stale file in public/, while a site
+        // that has only the file keeps it.
+        $skipped = array_merge($this->copyPublicPaths(), $this->copyAssets());
+
         $this->writeGeneratedPages();
 
         return [
             'excluded' => $excluded,
-            'skipped' => array_merge($this->copyPublicPaths(), $this->copyAssets()),
+            'skipped' => $skipped,
         ];
     }
 

@@ -200,7 +200,7 @@ Kræver Laravel-scheduleren på serveren (`schedule:run` hvert minut).
   standard `skabelon_*`). De er værktøjer i CMS'et, ikke sider på sitet.
 - Filer over Cloudflares grænse på 25 MiB. De nævnes i advarslerne.
 - Alt i `public/` som ikke står i `public_paths` (`build`, `fonts`,
-  `favicon.ico`). Asset-containere kopieres altid.
+  `favicon.ico`, `robots.txt`). Asset-containere kopieres altid.
 
 ### Sider sitet laver med PHP
 
@@ -214,6 +214,9 @@ skrevet, og gemmes som filer under samme navn — som standard:
 | `sitemap.xml` | Sitets sitemap, som sitet bygger den |
 | `robots.txt` | Peger på sitemappen, med sitets eget domæne |
 | `_redirects` | Cloudflares eget redirect-format. Omdirigeringerne sker på kanten, uden at noget kører |
+
+De skrives **efter** `public_paths` er kopieret: svarer sitet på `/robots.txt`
+med en rute, vinder ruten; har sitet kun filen i `public/`, beholder det filen.
 
 Sitet ejer hvad de siger; listen her siger kun at de skal med. Svarer en adresse
 ikke 200, springes den over — en manglende sitemap henter søgemaskinerne igen
